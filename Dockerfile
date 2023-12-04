@@ -1,26 +1,34 @@
-# /app /usr /lib
-FROM node:19.2-alpine3.16
-
-# cd app
+# Inicio stage deps
+FROM node:19.2-alpine3.16 as deps
 WORKDIR /app
-
-# Dest /pp
 COPY package.json ./
-
-# Instalar dependencias  incluidos los test
 RUN npm install
+# Fin stage deps
 
-# Copiar todo el proyecto
+
+# Inicio stage builder
+FROM node:19.2-alpine3.16 as builder
+WORKDIR /app
+# Copia modulos de Node del stage deps
+COPY --from=deps /app/node_modules ./node_modules
+# Copiar resto del proyecto
 COPY . .
-
-# Realizar testing 
 RUN npm run test
+# Fin stage builder
 
-# Eliminar archivos y directorios no necesarios en PROD
-RUN rm -rf test && rm -rf node_modules
-
-# Instalar dependencias unicamentes de PROD
+# Inicio stage prod-deps
+FROM node:19.2-alpine3.16 as prod-deps
+WORKDIR /app
+COPY package.json ./
 RUN npm install --prod
+# Fin stage prod-deps
 
-# Comando ejecutar aplicacion
+
+# Inicio stage runner
+FROM node:19.2-alpine3.16 as runner
+WORKDIR /app
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY app.js /app
+COPY tasks/ ./tasks
 CMD [ "node", "app.js" ]
+# Fin stage runner
